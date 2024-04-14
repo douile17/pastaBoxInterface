@@ -85,7 +85,7 @@ class App:
     def __init__(self, root):
         self.root = root
         self.root.title("Pasta Box")
-
+        root.iconbitmap('favicon.ico')
         # Calculez les dimensions de l'écran
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
@@ -109,13 +109,18 @@ class App:
 
         self.ports = self.get_serial_ports()
         self.port_var = tk.StringVar()
+        self.port_var.set("Select COM port ->")  # Définit la valeur par défaut du menu déroulant
         self.port_dropdown = tk.OptionMenu(self.port_frame, self.port_var, *self.ports)
-        self.port_dropdown.config(bg=self.button_bg_color, bd=1, relief=tk.FLAT, width=30)
+        self.port_dropdown.config(bg=self.button_bg_color, bd=1, relief=tk.FLAT, width=30,activebackground="#0078D7", activeforeground="white")
 
         for option in self.port_dropdown.children.values():
-            option.config(bg="#FFFFFF", relief=tk.FLAT)
+            option.config(bg="#FFFFFF", relief=tk.FLAT )
 
         self.port_dropdown.grid(row=0, column=1)
+
+        # Ajoutez ces lignes pour lier les événements de survol de la souris
+        self.port_dropdown.bind("<Enter>", self.on_enter_port_dropdown)
+        self.port_dropdown.bind("<Leave>", self.on_leave_port_dropdown)
 
         self.load_button = tk.Button(root, text="Load CSV", command=self.load_csv, bg=self.button_bg_color, bd=1, relief=tk.FLAT)
         self.load_button.grid(row=1, column=0, padx=10, pady=5, sticky="w")
@@ -212,6 +217,12 @@ class App:
         else:
             if messagebox.askokcancel("Quit", "Do you want to quit?"):
                 self.root.destroy()
+
+    def on_enter_port_dropdown(self, event):
+        self.port_dropdown.config(bg="blue")  # Change la couleur de fond en bleu lorsque la souris entre
+
+    def on_leave_port_dropdown(self, event):
+        self.port_dropdown.config(bg=self.button_bg_color)  # Revenir à la couleur de fond d'origine lorsque la souris quitte
 
 # Créez la racine et l'application
 root = tk.Tk()
