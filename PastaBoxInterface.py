@@ -22,7 +22,7 @@ class SerialController:
         self.running = True
         self.paused = False
         self.filename = filename
-        self.app.update_console("Script started.")
+        self.app.update_console("Sequence started:")
         self.thread = Thread(target=self.send_data)
         self.thread.start()
 
@@ -31,16 +31,16 @@ class SerialController:
         if self.ser.is_open:
             self.ser.write(b'D')
             self.ser.close()
-        self.app.update_console("Script stopped.")
+        self.app.update_console("Sequence stopped.")
         self.app.reset_buttons()
 
     def pause(self):
         self.paused = True
-        self.app.update_console("Script paused.")
+        self.app.update_console("Sequence paused.")
 
     def resume(self):
         self.paused = False
-        self.app.update_console("Script resumed.")
+        self.app.update_console("Sequence resumed.")
 
     def send_data(self):
         data = self.load_csv(self.filename)
@@ -107,24 +107,22 @@ class App:
         self.port_label = tk.Label(self.port_frame, text="Select COM port:", bg=self.bg_color)
         self.port_label.grid(row=0, column=0, padx=(0, 5))
 
-        self.ports = self.get_serial_ports()
-        self.port_var = tk.StringVar()
-        self.port_dropdown = tk.OptionMenu(self.port_frame, self.port_var, *self.ports)
-        self.port_dropdown.config(bg=self.button_bg_color, bd=1, relief=tk.FLAT, width=30)  # Largeur fixe de l'OptionMenu
+        self.ports = [port_info.device for port_info in comports()]
+        self.port_dropdown = None
+        self.ports_available_label = tk.Label(self.port_frame, text="", bg=self.bg_color)  # Initialisation de l'attribut
+        self.ports_available_label.grid(row=1, columnspan=2)  # Positionnement de l'annotation
 
-        # Appliquer la couleur de fond blanc aux propositions du menu déroulant
-        for option in self.port_dropdown.children.values():
-            option.config(bg="#FFFFFF", relief=tk.FLAT)
-
-        self.port_dropdown.grid(row=0, column=1)
+        self.refresh_ports()
 
         self.load_button = tk.Button(root, text="Load CSV", command=self.load_csv, bg=self.button_bg_color, bd=1, relief=tk.FLAT)
         self.load_button.grid(row=1, column=0, padx=10, pady=5, sticky="w")
 
-        self.start_stop_button = tk.Button(root, text="Start", command=self.start_stop, width=10, highlightbackground="green", bg=self.button_bg_color, activebackground=self.button_bg_color, relief=tk.FLAT, borderwidth=1, state=tk.DISABLED)
+        # Création du bouton "Start" désactivé et grisé
+        self.start_stop_button = tk.Button(root, text="Start", command=self.start_stop, width=10, highlightbackground="green", bg=self.button_disabled_color, activebackground=self.button_bg_color, relief=tk.FLAT, borderwidth=1, state=tk.DISABLED, disabledforeground="#A9A9A9")
         self.start_stop_button.grid(row=0, column=2, padx=10, pady=5, sticky="e")
 
-        self.pause_button = tk.Button(root, text="Pause", command=self.pause_resume, width=10, highlightbackground="red", bg=self.button_bg_color, activebackground=self.button_bg_color, relief=tk.FLAT, borderwidth=1, state=tk.DISABLED)
+        # Création du bouton "Pause" désactivé et grisé
+        self.pause_button = tk.Button(root, text="Pause", command=self.pause_resume, width=10, highlightbackground="red", bg=self.button_disabled_color, activebackground=self.button_bg_color, relief=tk.FLAT, borderwidth=1, state=tk.DISABLED, disabledforeground="#A9A9A9")
         self.pause_button.grid(row=1, column=2, padx=10, pady=5, sticky="e")
 
         self.console_label = tk.Label(root, text="Console:")
@@ -148,18 +146,36 @@ class App:
         # Gestion de la fermeture de la fenêtre
         root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-    def get_serial_ports(self):
-        ports = []
-        for port_info in comports():
-            ports.append(f"{port_info.device} - {port_info.description}")
-        return ports
-
     def refresh_ports(self):
-        self.ports = self.get_serial_ports()
-        menu = self.port_dropdown["menu"]
-        menu.delete(0, "end")
-        for port in self.ports:
-            menu.add_command(label=port, command=lambda value=port: self.port_var.set(value))
+        self.ports = [port_info.device for port_info in comports()]
+
+        # Supprimer l'ancien menu déroulant s'il existe
+        if self.port_dropdown:
+            self.port_dropdown.destroy()
+
+        if self.ports:
+            # Créer un nouveau menu déroulant seulement s'il y a des ports disponibles
+            formatted_ports = [f"{port_info.device} - {port_info.description}" for port_info in comports()]
+            self.port_var = tk.StringVar()
+
+            # Option par défaut avec l'annotation
+            default_option = "COM ports available ->"
+            self.port_var.set(default_option)
+            self.port_dropdown = tk.OptionMenu(self.port_frame, self.port_var, *formatted_ports)
+
+            self.port_dropdown.config(bg=self.button_bg_color, bd=1, relief=tk.FLAT, width=30)
+            for option in self.port_dropdown.children.values():
+                option.config(bg="#FFFFFF", relief=tk.FLAT)
+
+            self.port_dropdown.grid(row=0, column=1)
+
+            # Afficher l'annotation des ports disponibles
+            self.ports_available_label.config(text="", fg=self.bg_color)
+        else:
+            # Affichez un message si aucun port n'est disponible
+            self.ports_available_label.config(text="", fg=self.bg_color)
+
+            tk.Label(self.port_frame, text="No serial ports available", bg=self.bg_color).grid(row=0, column=1)
 
     def load_csv(self):
         filename = filedialog.askopenfilename(title="Select CSV File", filetypes=[("CSV files", "*.csv")])
@@ -170,14 +186,29 @@ class App:
             self.update_console("CSV file loaded successfully: " + filename)
 
     def start_stop(self):
+        if not self.ports:
+            self.update_console("No serial ports available")
+            return
+
         if not self.port_var.get():
             self.update_console("Please select a COM port.")
             return
 
+        selected_port = self.port_var.get().split(" - ")[0]
+
+        # Vérifier si le port sélectionné est dans la liste des ports disponibles
+        if selected_port not in self.ports:
+            self.update_console("Selected port is not available.")
+            return
+
         if self.serial_controller is None:
-            self.serial_controller = SerialController(self.port_var.get().split(" - ")[0], self.console, self)
+            self.serial_controller = SerialController(selected_port, self.console, self)
 
         if self.start_stop_button.cget("text") == "Start":
+            if not hasattr(self, 'filename') or not self.filename:
+                self.update_console("Please load a CSV file.")
+                return
+
             self.serial_controller.start(self.filename)
             self.start_stop_button.config(text="Stop", bg="red")
             self.pause_button.config(state=tk.NORMAL)
