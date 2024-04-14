@@ -85,7 +85,17 @@ class App:
     def __init__(self, root):
         self.root = root
         self.root.title("Pasta Box")
-        self.root.geometry("600x400")
+
+        # Calculez les dimensions de l'écran
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+
+        # Calculez les coordonnées x et y pour centrer la fenêtre
+        x = (screen_width - 600) / 2
+        y = (screen_height - 400) / 2
+
+        # Placez la fenêtre au centre de l'écran
+        self.root.geometry("+%d+%d" % (x, y))
 
         self.bg_color = "#f0f0f0"
         self.button_bg_color = "#FFFFFF"
@@ -110,10 +120,11 @@ class App:
         self.load_button = tk.Button(root, text="Load CSV", command=self.load_csv, bg=self.button_bg_color, bd=1, relief=tk.FLAT)
         self.load_button.grid(row=1, column=0, padx=10, pady=5, sticky="w")
 
-        self.start_stop_button = tk.Button(root, text="Start", command=self.start_stop, width=10, highlightbackground="green", bg=self.button_bg_color, activebackground=self.button_bg_color, relief=tk.FLAT, borderwidth=1, state=tk.DISABLED)
+        # Initialisez les boutons Start et Pause avec l'état DISABLED et une couleur de fond grise
+        self.start_stop_button = tk.Button(root, text="Start", command=self.start_stop, width=10, highlightbackground="green", bg="gray", activebackground="gray", relief=tk.FLAT, borderwidth=1, state=tk.DISABLED, disabledforeground="#373737")
         self.start_stop_button.grid(row=0, column=2, padx=10, pady=5, sticky="e")
 
-        self.pause_button = tk.Button(root, text="Pause", command=self.pause_resume, width=10, highlightbackground="red", bg=self.button_bg_color, activebackground=self.button_bg_color, relief=tk.FLAT, borderwidth=1, state=tk.DISABLED)
+        self.pause_button = tk.Button(root, text="Pause", command=self.pause_resume, width=10, highlightbackground="red", bg="gray", activebackground="gray", relief=tk.FLAT, borderwidth=1, state=tk.DISABLED, disabledforeground="#373737")
         self.pause_button.grid(row=1, column=2, padx=10, pady=5, sticky="e")
 
         self.console_label = tk.Label(root, text="Console:")
@@ -155,6 +166,7 @@ class App:
             self.filename = filename
             self.start_stop_button.config(state=tk.NORMAL, text="Start", fg="white", bg="green")
             self.update_console("CSV file loaded successfully: " + filename)
+            self.pause_button.config(state=tk.DISABLED)  # Désactiver le bouton Pause lors du chargement d'un nouveau fichier CSV
 
     def start_stop(self):
         if not self.port_var.get():
@@ -164,12 +176,12 @@ class App:
         if self.serial_controller is None or not self.serial_controller.running_event.is_set():
             self.serial_controller = SerialController(self.port_var.get().split(" - ")[0], self.console, self)
             self.serial_controller.start(self.filename)
-            self.start_stop_button.config(text="Stop", bg="red")
-            self.pause_button.config(state=tk.NORMAL)
+            self.start_stop_button.config(text="Stop", bg="red", state=tk.NORMAL)  # Activer le bouton Stop
+            self.pause_button.config(state=tk.NORMAL)  # Activer le bouton Pause
         else:
             self.serial_controller.stop()
-            self.start_stop_button.config(text="Start", bg="green")
-            self.pause_button.config(state=tk.DISABLED)
+            self.start_stop_button.config(text="Start", bg="green", state=tk.NORMAL)  # Activer le bouton Start
+            self.pause_button.config(state=tk.DISABLED)  # Désactiver le bouton Pause lorsque le script est arrêté
 
     def pause_resume(self):
         if self.serial_controller is not None:
@@ -191,8 +203,8 @@ class App:
         self.console.see(tk.END)
 
     def reset_buttons(self):
-        self.start_stop_button.config(text="Start", bg="green")
-        self.pause_button.config(state=tk.DISABLED)
+        self.start_stop_button.config(text="Start", bg="green", state=tk.DISABLED)  # Désactiver le bouton Start lors de la réinitialisation
+        self.pause_button.config(state=tk.DISABLED)  # Désactiver le bouton Pause lors de la réinitialisation
 
     def on_close(self):
         if self.serial_controller is not None and self.serial_controller.running_event.is_set():
@@ -203,6 +215,7 @@ class App:
             if messagebox.askokcancel("Quit", "Do you want to quit?"):
                 self.root.destroy()
 
+# Créez la racine et l'application
 root = tk.Tk()
 app = App(root)
 root.mainloop()
